@@ -1,0 +1,91 @@
+#!/bin/bash
+
+BASE_DIR="$HOME/ssh-manager"
+KEY_DIR="$BASE_DIR/keys"
+KEY_FILE="$KEY_DIR/id_ed25519"
+HOST_DB="$BASE_DIR/hosts.json"
+SSH_CONFIG="$HOME/.ssh/config"
+BACKUP_DIR="$BASE_DIR/backups"
+
+mkdir -p "$KEY_DIR" "$BACKUP_DIR" "$HOME/.ssh"
+
+# ----------------------------
+# Generate Key
+# ----------------------------
+generate_key() {
+    if [ ! -f "$KEY_FILE" ]; then
+        echo "Generating SSH key..."
+        ssh-keygen -t ed25519 -f "$KEY_FILE" -N ""
+    fi
+}
+
+# ----------------------------
+# Init DB
+# ----------------------------
+init_db() {
+    if [ ! -f "$HOST_DB" ]; then
+        echo "[]" > "$HOST_DB"
+    fi
+}
+
+# ----------------------------
+# Get Fingerprint
+# ----------------------------
+get_fingerprint() {
+    ssh-keygen -lf "$KEY_FILE.pub" | awk '{print $2}'
+}
+
+# ----------------------------
+# Add Multiple Hosts
+# ----------------------------
+add_hosts() {
+    read -p "Group name: " GROUP
+    read -p "Username: " USER
+    read -p "Enter hosts (space separated): " HOSTS
+
+    FP=$(get_fingerprint)
+
+    for HOST in $HOSTS; do
+        read -p "Alias for $HOST: " ALIAS
+
+        echo "[<3]Installing key on $HOST..."
+        ssh-copy-id -i "$KEY_FILE.pub" "$USER@$HOST"
+
+        TMP=$(mktemp)
+        jq ". += [{
+            \"alias\":\"$ALIAS\",
+            \"host\":\"$HOST\",
+            \"user\":\"$USER\",
+            \"group\":\"$GROUP\",
+            \"fingerprint\":\"$FP\"
+        }]" "$HOST_DB" > "$TMP" && mv "$TMP" "$HOST_DB"
+
+        echo "Added $ALIAS"
+    done
+
+    rebuild_config
+}
+Echo "-------------------------------------------------"
+# ----------------------------
+# Rebuild SSH Config
+# ----------------------------
+rebuild_config() {
+    echo "Rebuilding SSH config..."
+    echo "" > "$SSH_CONFIG"
+
+    jq -r '.[] |
+    "Host \(.alias)
+    HostName \(.host)
+    User \(.user)
+    IdentityFile '"$KEY_FILE"'
+"' "$HOST_DB" >> "$SSH_CONFIG"
+}
+Echo "--------------------------------------------"
+# ----------------------------
+# List Hosts
+# ----------------------------
+list_hosts() {
+    jq -r '.[] | "\(.alias) [\(.group)] -> \(.user)@\(.host)"' "$HOST_DB"
+}
+
+# ----------------------------
