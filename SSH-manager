@@ -89,3 +89,117 @@ list_hosts() {
 }
 
 # ----------------------------
+# ----------------------------
+# Interactive Menu
+# ----------------------------
+interactive_menu() {
+    init_db
+    generate_key
+
+    if [ ! -s "$HOST_DB" ] || [ "$(jq length "$HOST_DB")" -eq 0 ]; then
+        echo "No hosts configured."
+        return
+    fi
+
+    selection=$(jq -r '.[] | "\(.alias) [\(.group)] -> \(.user)@\(.host)"' "$HOST_DB" \
+        | fzf --height=40% \
+              --border \
+              --prompt="Select SSH Host > " \
+              --preview-window=right:40% \
+              --preview="echo {}")
+
+    if [ -z "$selection" ]; then
+        return
+    fi
+
+    alias=$(echo "$selection" | awk '{print $1}')
+
+    echo "Connecting to $alias..."
+    ssh "$alias"
+}
+# ----------------------------
+# Backup System
+# ----------------------------
+backup_all() {
+    TS=$(date +%Y%m%d-%H%M%S)
+    DEST="$BACKUP_DIR/backup-$TS"
+    mkdir -p "$DEST"
+
+    cp -r "$KEY_DIR" "$DEST/"
+    cp "$HOST_DB" "$DEST/"
+    cp "$SSH_CONFIG" "$DEST/"
+
+    echo "Backup created at $DEST"
+}
+
+# ----------------------------
+# Restore Backup
+# ----------------------------
+restore_backup() {
+    read -p "Path to backup folder: " PATH_RESTORE
+
+    cp -r "$PATH_RESTORE/keys" "$BASE_DIR/"
+    cp "$PATH_RESTORE/hosts.json" "$HOST_DB"
+    cp "$PATH_RESTORE/config" "$SSH_CONFIG" 2>/dev/null || true
+
+    rebuild_config
+    echo "Restore complete."
+}
+# ----------------------------
+# Main
+# ----------------------------
+case "$1" in
+    add)
+        generate_key
+        init_db
+        add_hosts
+        ;;
+    list)
+        list_hosts
+        ;;
+    group)
+        list_group
+        ;;
+    rebuild)
+        rebuild_config
+        ;;
+    backup)
+        backup_all
+        ;;
+    restore)
+        restore_backup
+        ;;
+    *)
+        ;;
+esac
+# ----------------------------
+# Main Menu
+# ----------------------------
+main_menu() {
+    while true; do
+        choice=$(printf "Connect\nAdd Hosts\nList Hosts\nRebuild Config\nExit" \
+            | fzf --height=40% --border --prompt="SSH Manager > ")
+
+        case "$choice" in
+            "Connect")
+                interactive_menu
+                ;;
+            "Add Hosts")
+                add_hosts
+                ;;
+            "List Hosts")
+                list_hosts
+                read -p "Press Enter to continue..."
+                ;;
+            "Rebuild Config")
+                rebuild_config
+                ;;
+            "Exit")
+                exit 0
+                ;;
+        esac
+    done
+}
+
+main_menu
+
