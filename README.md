@@ -1,8 +1,11 @@
 # SSH-Handler
 Basic SSH-Handler. 
 Just A one stop shop for all your SSH connections because im lazy.
+
+
 Requirements:
 Mkdir -p ~/.Easyssh
+
 You will need fzf
 apt-get install fzf
 or
