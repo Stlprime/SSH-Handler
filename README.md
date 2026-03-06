@@ -1,6 +1,6 @@
 # SSH-Handler
 Basic SSH-Handler. 
-Just A one stop shop for all your SSH connections because im lazy.
+Just A one stop shop for all your SSH connections.
 
 
 Requirements:
