@@ -4,7 +4,7 @@ Just A one stop shop for all your SSH connections because im lazy.
 
 
 Requirements:
-Mkdir -p ~/.Easyssh
+Mkdir -p ~/.easyssh
 
 You will need fzf
 apt-get install fzf
